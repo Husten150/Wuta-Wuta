@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Gallery as GalleryIcon, 
+  Image as GalleryIcon, 
   Search, 
   ShoppingCart,
   TrendingUp,
