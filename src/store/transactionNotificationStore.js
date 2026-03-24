@@ -43,8 +43,8 @@ const useTransactionNotificationStore = create(
       };
 
       transactions.set(transaction.id, transaction);
-      
-      set({ 
+
+      set({
         transactions: new Map(transactions),
         notifications: [
           ...get().notifications,
@@ -62,14 +62,14 @@ const useTransactionNotificationStore = create(
 
       // Start monitoring the transaction
       get().monitorTransaction(transaction.id);
-      
+
       return transaction.id;
     },
 
     updateTransactionStatus: (transactionId, newStatus, details = {}) => {
       const { transactions, STATUS, NOTIFICATION_TYPES } = get();
       const transaction = transactions.get(transactionId);
-      
+
       if (!transaction) return;
 
       const updatedTransaction = {
@@ -99,7 +99,7 @@ const useTransactionNotificationStore = create(
             message: `Your ${transaction.type} transaction has been successfully confirmed.`
           };
           break;
-        
+
         case STATUS.FAILED:
           notification = {
             ...notification,
@@ -109,7 +109,7 @@ const useTransactionNotificationStore = create(
             autoHide: false
           };
           break;
-        
+
         case STATUS.TIMEOUT:
           notification = {
             ...notification,
@@ -130,7 +130,7 @@ const useTransactionNotificationStore = create(
     monitorTransaction: async (transactionId) => {
       const { transactions, STATUS } = get();
       const transaction = transactions.get(transactionId);
-      
+
       if (!transaction) return;
 
       try {
@@ -154,7 +154,7 @@ const useTransactionNotificationStore = create(
 
             // Check transaction status on blockchain
             const status = await get().checkTransactionStatus(transactionId);
-            
+
             if (status === STATUS.CONFIRMED) {
               get().updateTransactionStatus(transactionId, STATUS.CONFIRMED);
               clearInterval(pollInterval);
@@ -178,18 +178,45 @@ const useTransactionNotificationStore = create(
     checkTransactionStatus: async (transactionId) => {
       const { transactions } = get();
       const transaction = transactions.get(transactionId);
-      
-      if (!transaction || !transaction.hash) {
-        throw new Error('Transaction hash not found');
+
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // If hash is not yet available, it's still in initial submission phase
+      if (!transaction.hash) {
+        return get().STATUS.PENDING;
       }
 
       try {
         // Use the existing museStore to check transaction status
         const { useMuseStore } = await import('./museStore');
         const museStore = useMuseStore.getState();
-        
+
+        // Prefer Soroban RPC for status checking if available
+        if (museStore.stellarClient && typeof museStore.stellarClient.getTransaction === 'function') {
+          try {
+            const sorobanResult = await museStore.stellarClient.getTransaction(transaction.hash);
+
+            switch (sorobanResult.status) {
+              case 'SUCCESS':
+                return get().STATUS.CONFIRMED;
+              case 'FAILED':
+                return get().STATUS.FAILED;
+              case 'NOT_FOUND':
+                // Check Horizon as fallback or continue pending
+                break;
+              default:
+                return get().STATUS.PENDING;
+            }
+          } catch (sorobanError) {
+            console.warn('Soroban RPC check failed, falling back to Horizon:', sorobanError);
+          }
+        }
+
+        // Fallback or secondary check via Horizon
         if (!museStore.horizonServer) {
-          throw new Error('Horizon server not available');
+          return get().STATUS.PENDING; // Keep pending if no server to check
         }
 
         const txResult = await museStore.horizonServer
@@ -197,15 +224,21 @@ const useTransactionNotificationStore = create(
           .transaction(transaction.hash)
           .call();
 
-        return txResult.successful ? 
-          get().STATUS.CONFIRMED : 
+        return txResult.successful ?
+          get().STATUS.CONFIRMED :
           get().STATUS.FAILED;
 
       } catch (error) {
-        if (error.response && error.response.status === 404) {
-          // Transaction not found yet, still pending
+        if (error.response && (error.response.status === 404 || error.response.status === 400)) {
+          // Transaction not found yet on Horizon/RPC, still pending
           return get().STATUS.PENDING;
         }
+
+        // For Soroban "NOT_FOUND" usually means it hasn't landed yet
+        if (error.message && error.message.includes('not found')) {
+          return get().STATUS.PENDING;
+        }
+
         throw error;
       }
     },
@@ -213,7 +246,7 @@ const useTransactionNotificationStore = create(
     retryTransaction: async (transactionId) => {
       const { transactions, STATUS } = get();
       const transaction = transactions.get(transactionId);
-      
+
       if (!transaction) {
         throw new Error('Transaction not found');
       }
@@ -287,7 +320,7 @@ const useTransactionNotificationStore = create(
     clearCompletedTransactions: () => {
       const { transactions, STATUS } = get();
       const activeTransactions = new Map();
-      
+
       transactions.forEach((tx, id) => {
         if (tx.status === STATUS.PENDING) {
           activeTransactions.set(id, tx);

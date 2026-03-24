@@ -1,15 +1,18 @@
+
 import React, { useEffect, useState } from 'react';
+
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
+
+import {
+  X,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
   Info,
   RefreshCw,
   ExternalLink
 } from 'lucide-react';
-import { useTransactionNotificationStore } from '../store/transactionNotificationStore';
+import { useTransactionNotificationStore } from '../../store/transactionNotificationStore';
 
 const ToastNotification = ({ notification, onDismiss }) => {
   const [isVisible, setIsVisible] = useState(true);
@@ -19,7 +22,7 @@ const ToastNotification = ({ notification, onDismiss }) => {
     if (notification.autoHide && notification.duration) {
       const interval = 50; // Update progress every 50ms
       const decrement = (100 * interval) / notification.duration;
-      
+
       const timer = setInterval(() => {
         setProgress(prev => {
           const newProgress = prev - decrement;
@@ -102,7 +105,7 @@ const ToastNotification = ({ notification, onDismiss }) => {
         <div className="flex-shrink-0 mr-3">
           {getIcon()}
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <h4 className={`text-sm font-semibold ${getTextColor()}`}>
             {notification.title}
@@ -110,7 +113,7 @@ const ToastNotification = ({ notification, onDismiss }) => {
           <p className={`text-sm mt-1 ${getTextColor()} opacity-90`}>
             {notification.message}
           </p>
-          
+
           {notification.timestamp && (
             <p className="text-xs text-gray-500 mt-2">
               {new Date(notification.timestamp).toLocaleTimeString()}
@@ -133,18 +136,18 @@ const ToastNotification = ({ notification, onDismiss }) => {
 };
 
 const TransactionToast = ({ notification, onDismiss }) => {
-  const { 
-    getTransaction, 
-    retryTransaction, 
-    STATUS 
+  const {
+    getTransaction,
+    retryTransaction,
+    STATUS
   } = useTransactionNotificationStore();
-  
+
   const transaction = getTransaction(notification.transactionId);
   const [isRetrying, setIsRetrying] = useState(false);
 
   const handleRetry = async () => {
     if (!transaction) return;
-    
+
     setIsRetrying(true);
     try {
       await retryTransaction(notification.transactionId);
@@ -185,7 +188,7 @@ const TransactionToast = ({ notification, onDismiss }) => {
         <div className="flex-shrink-0 mr-3">
           {getStatusIcon()}
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <h4 className="text-sm font-semibold text-gray-900">
             {notification.title}
@@ -193,7 +196,7 @@ const TransactionToast = ({ notification, onDismiss }) => {
           <p className="text-sm text-gray-600 mt-1">
             {notification.message}
           </p>
-          
+
           {transaction && (
             <div className="mt-2 space-y-2">
               <div className="flex items-center justify-between text-xs">
@@ -204,7 +207,7 @@ const TransactionToast = ({ notification, onDismiss }) => {
                   {transaction.hash ? `${transaction.hash.slice(0, 8)}...${transaction.hash.slice(-8)}` : 'Processing...'}
                 </span>
               </div>
-              
+
               {transaction.status === STATUS.FAILED && transaction.retryCount < transaction.maxRetries && (
                 <button
                   onClick={handleRetry}
@@ -215,7 +218,7 @@ const TransactionToast = ({ notification, onDismiss }) => {
                   Retry ({transaction.retryCount}/{transaction.maxRetries})
                 </button>
               )}
-              
+
               {transaction.hash && (
                 <button
                   onClick={openExplorer}
@@ -227,7 +230,7 @@ const TransactionToast = ({ notification, onDismiss }) => {
               )}
             </div>
           )}
-          
+
           <p className="text-xs text-gray-500 mt-2">
             {new Date(notification.timestamp).toLocaleTimeString()}
           </p>
@@ -245,10 +248,10 @@ const TransactionToast = ({ notification, onDismiss }) => {
 };
 
 const NotificationContainer = () => {
-  const { 
-    notifications, 
-    dismissNotification, 
-    clearAllNotifications 
+  const {
+    notifications,
+    dismissNotification,
+    clearAllNotifications
   } = useTransactionNotificationStore();
 
   if (notifications.length === 0) return null;
@@ -266,7 +269,7 @@ const NotificationContainer = () => {
           </button>
         </div>
       )}
-      
+
       <AnimatePresence>
         {notifications.map((notification) => (
           <div key={notification.id}>
